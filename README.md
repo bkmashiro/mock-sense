@@ -2,10 +2,12 @@
 
 [![npm](https://img.shields.io/npm/v/mock-sense)](https://www.npmjs.com/package/mock-sense) [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-`mock-sense` is a CLI that scans unit test files for two common smells:
+`mock-sense` is a CLI that scans unit test files for mock-related test smells:
 
 - over-mocking, based on a mock-to-assertion ratio
 - vacuous assertions that always pass
+- dead mocks that are configured but never used
+- unchecked mocks that are called without any follow-up assertion
 
 ## Install
 
@@ -32,6 +34,8 @@ Options:
 - `--threshold <n>`: Mock/assert ratio threshold. Default: `3.0`
 - `--json`: Emit JSON instead of terminal output
 - `--no-fail`: Report only. Do not exit with status `1` when issues are found
+- `--coverage`: Show mock usage coverage for each test file
+- `--suggest`: Suggest missing assertions from mock call patterns
 - `--ext <exts>`: Comma-separated test file extensions. Default: `.test.ts,.test.js,.spec.ts,.spec.js`
 
 ## What It Detects
@@ -67,6 +71,20 @@ If `mocks / assertions` is greater than the configured threshold, the file is fl
 - `expect(true).toBe(true)`
 - `assert.ok(undefined !== undefined)`
 
+### Mock Coverage
+
+`mock-sense --coverage` tracks locally defined mocks such as `const sendEmail = jest.fn()` and reports:
+
+- mocks that are never called
+- mocks that are called but never asserted on
+
+### Suggestions
+
+`mock-sense --suggest` uses the same call analysis to recommend missing assertions such as:
+
+- `expect(sendEmail).toHaveBeenCalledWith(...)`
+- `expect(result).toBeDefined()` for unchecked mock return values
+
 ## Examples
 
 ```bash
@@ -94,3 +112,11 @@ mock-sense test --json --no-fail
 ```
 
 Outputs structured JSON suitable for CI or custom reporting.
+
+```bash
+mock-sense test --coverage
+```
+
+```bash
+mock-sense test --suggest
+```

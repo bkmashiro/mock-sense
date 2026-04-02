@@ -1,6 +1,8 @@
 import path from "node:path";
 import chalk from "chalk";
+import type { CoverageFileAnalysis } from "./coverage-checker.js";
 import type { FileAnalysis } from "./detector.js";
+import type { Suggestion } from "./suggester.js";
 
 export interface ReportData {
   analyzedPath: string;
@@ -10,6 +12,22 @@ export interface ReportData {
   vacuousAssertions: number;
   issuesFound: boolean;
   threshold: number;
+}
+
+export interface CoverageReportData {
+  analyzedPath: string;
+  analyzedFileCount: number;
+  results: CoverageFileAnalysis[];
+  deadMocks: number;
+  uncheckedMocks: number;
+  issuesFound: boolean;
+}
+
+export interface SuggestionReportData {
+  analyzedPath: string;
+  analyzedFileCount: number;
+  suggestions: Suggestion[];
+  issuesFound: boolean;
 }
 
 export function formatReport(report: ReportData): string {
@@ -52,4 +70,66 @@ export function formatReport(report: ReportData): string {
   lines.push(`Exit code: ${report.issuesFound ? 1 : 0} (${report.issuesFound ? "issues found" : "healthy"})`);
 
   return lines.join("\n");
+}
+
+export function formatCoverageReport(report: CoverageReportData): string {
+  const lines: string[] = [];
+  lines.push("Mock Usage Coverage:");
+  lines.push("");
+
+  for (const result of report.results) {
+    if (result.mocks.length === 0) {
+      continue;
+    }
+
+    const displayPath = path.relative(process.cwd(), result.filePath) || result.filePath;
+    lines.push(`  ${displayPath}`);
+
+    for (const mock of result.mocks) {
+      if (mock.callCount === 0) {
+        lines.push(`  ${chalk.red("❌")} ${mock.name} (mocked but NEVER called - dead mock)`);
+        continue;
+      }
+
+      if (!mock.assertedOn) {
+        lines.push(
+          `  ${chalk.yellow("⚠")}  ${mock.name} (mocked, called ${mock.callCount}x but never asserted on)`
+        );
+        continue;
+      }
+
+      lines.push(`  ${chalk.green("✅")} ${mock.name} (mocked, called ${mock.callCount}x)`);
+    }
+
+    lines.push("");
+  }
+
+  lines.push(
+    `Dead mocks: ${report.deadMocks} ${report.deadMocks > 0 ? "(remove them to simplify tests)" : ""}`.trimEnd()
+  );
+  lines.push(
+    `Unchecked mocks: ${report.uncheckedMocks} ${report.uncheckedMocks > 0 ? "(add assertions)" : ""}`.trimEnd()
+  );
+
+  return lines.join("\n");
+}
+
+export function formatSuggestionReport(report: SuggestionReportData): string {
+  const lines: string[] = [];
+  lines.push("Suggested improvements:");
+  lines.push("");
+
+  for (const suggestion of report.suggestions) {
+    const displayPath = path.relative(process.cwd(), suggestion.filePath) || suggestion.filePath;
+    lines.push(`${displayPath}:${suggestion.line}`);
+    lines.push(`  ${suggestion.reason}`);
+    lines.push(`  → Add: ${suggestion.suggestion}`);
+    lines.push("");
+  }
+
+  if (report.suggestions.length === 0) {
+    lines.push("No missing mock assertions found.");
+  }
+
+  return lines.join("\n").trimEnd();
 }

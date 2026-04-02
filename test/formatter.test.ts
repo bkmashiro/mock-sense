@@ -1,7 +1,14 @@
 import assert from "node:assert/strict";
 import path from "node:path";
 import test from "node:test";
-import { formatReport, type ReportData } from "../src/formatter.js";
+import {
+  formatCoverageReport,
+  formatReport,
+  formatSuggestionReport,
+  type CoverageReportData,
+  type ReportData,
+  type SuggestionReportData
+} from "../src/formatter.js";
 
 function createReportData(overrides: Partial<ReportData> = {}): ReportData {
   return {
@@ -71,4 +78,84 @@ test("formatReport renders suspicious and vacuous details with infinity ratio", 
   assert.match(output, /✓\s+\s+\(healthy\)/);
   assert.match(output, /Summary: 1 suspicious file, 1 vacuous assertion found\./);
   assert.match(output, /Exit code: 1 \(issues found\)$/);
+});
+
+test("formatCoverageReport renders dead and unchecked mocks", () => {
+  const report: CoverageReportData = {
+    analyzedPath: "test",
+    analyzedFileCount: 1,
+    deadMocks: 1,
+    uncheckedMocks: 1,
+    issuesFound: true,
+    results: [
+      {
+        filePath: path.join(process.cwd(), "test/api.test.ts"),
+        deadMocks: 1,
+        uncheckedMocks: 1,
+        mocks: [
+          {
+            name: "fetchUser",
+            line: 1,
+            callCount: 3,
+            assertedOn: true,
+            hasCallAssertion: true,
+            hasReturnAssertion: false,
+            assignedResults: [],
+            callSamples: [{ line: 4, args: ["1"] }]
+          },
+          {
+            name: "sendEmail",
+            line: 2,
+            callCount: 0,
+            assertedOn: false,
+            hasCallAssertion: false,
+            hasReturnAssertion: false,
+            assignedResults: [],
+            callSamples: []
+          },
+          {
+            name: "validateToken",
+            line: 3,
+            callCount: 1,
+            assertedOn: false,
+            hasCallAssertion: false,
+            hasReturnAssertion: false,
+            assignedResults: [{ variableName: "result", line: 5 }],
+            callSamples: [{ line: 5, args: ["token"] }]
+          }
+        ]
+      }
+    ]
+  };
+
+  const output = formatCoverageReport(report);
+  assert.match(output, /Mock Usage Coverage:/);
+  assert.match(output, /✅ fetchUser \(mocked, called 3x\)/);
+  assert.match(output, /❌ sendEmail \(mocked but NEVER called - dead mock\)/);
+  assert.match(output, /⚠\s+validateToken \(mocked, called 1x but never asserted on\)/);
+  assert.match(output, /Dead mocks: 1 \(remove them to simplify tests\)/);
+  assert.match(output, /Unchecked mocks: 1 \(add assertions\)$/);
+});
+
+test("formatSuggestionReport renders suggestions", () => {
+  const report: SuggestionReportData = {
+    analyzedPath: "test",
+    analyzedFileCount: 1,
+    issuesFound: true,
+    suggestions: [
+      {
+        filePath: path.join(process.cwd(), "test/api.test.ts"),
+        line: 42,
+        mockName: "sendEmail",
+        reason: 'sendEmail is called with (to, "Welcome", body)',
+        suggestion: 'expect(sendEmail).toHaveBeenCalledWith(to, "Welcome", body)'
+      }
+    ]
+  };
+
+  const output = formatSuggestionReport(report);
+  assert.match(output, /Suggested improvements:/);
+  assert.match(output, /test\/api\.test\.ts:42/);
+  assert.match(output, /sendEmail is called with \(to, "Welcome", body\)/);
+  assert.match(output, /→ Add: expect\(sendEmail\)\.toHaveBeenCalledWith\(to, "Welcome", body\)/);
 });
