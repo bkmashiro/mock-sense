@@ -1,5 +1,7 @@
 # mock-sense
 
+[![npm](https://img.shields.io/npm/v/mock-sense)](https://www.npmjs.com/package/mock-sense) [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+
 `mock-sense` is a CLI that scans unit test files for two common smells:
 
 - over-mocking, based on a mock-to-assertion ratio
